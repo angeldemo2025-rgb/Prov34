@@ -1,43 +1,53 @@
-<!DOCTYPE html><html lang="es">
+<!DOCTYPE html>
+<html lang="es">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Inventario PRO V18 (Hoja en Blanco + Historial)</title><style>
-:root{
-  --bg:#f5f7ff;
-  --card:#ffffff;
-  --primary:#2563eb;
-  --danger:#ef4444;
-  --muted:#64748b;
-}
-body{margin:0;font-family:Arial;background:var(--bg);}
-header{background:var(--primary);color:white;padding:14px;font-weight:bold;}
+<title> PROx45 </title>
+
+<style>
+body{margin:0;font-family:Arial;background:#f5f7ff;}
+header{background:#2563eb;color:#fff;padding:14px;font-weight:bold;}
 .container{max-width:900px;margin:auto;padding:15px;}
-.card{background:var(--card);padding:15px;border-radius:12px;margin-bottom:12px;box-shadow:0 4px 10px rgba(0,0,0,0.06);}
-input{width:100%;padding:10px;margin:6px 0;border:1px solid #ddd;border-radius:8px;}
-button{padding:10px;border:none;border-radius:8px;cursor:pointer;background:var(--primary);color:white;}
-.row{display:flex;gap:10px;flex-wrap:wrap;}
-.tableRow{display:grid;grid-template-columns:1fr 1fr 40px;gap:10px;margin-top:8px;align-items:center;}
-.hidden{display:none !important;}
-pre{background:#0f172a;color:#e2e8f0;padding:10px;border-radius:8px;overflow:auto;}
-</style><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script></head>
-<body><header>📦 Inventario PRO V18 (Hoja en Blanco + Historial)</header><div class="container"><div class="card" id="home">
-  <h3>👑 Crear formulario</h3>
-  <input id="formName" placeholder="Nombre del formulario" />
-  <button onclick="createForm()">Crear y abrir hoja en blanco</button>
-  <div id="forms"></div>
-</div><div class="card hidden" id="sheet">
-  <div class="row" style="justify-content:space-between;">
-    <button onclick="backHome()">⬅ Volver</button>
-    <button onclick="saveSheet()">💾 Guardar</button>
-    <button onclick="shareLink()">📤 Compartir</button>
-  </div>  <h3 id="title"></h3>
-  <div id="items"></div>
-  <button onclick="addRow()">➕ Agregar artículo</button>
-</div><div class="card">
-  <h3>📜 Historial</h3>
-  <div id="history"></div>
-</div></div><script>
+.card{background:#fff;padding:15px;border-radius:12px;margin-bottom:12px;}
+input{width:100%;padding:10px;margin:6px 0;}
+button{padding:10px;border:none;border-radius:8px;background:#2563eb;color:white;cursor:pointer;}
+.row{display:flex;gap:10px}
+.tableRow{display:grid;grid-template-columns:1fr 1fr 40px;gap:10px;margin-top:8px;}
+.hidden{display:none}
+</style>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+</head>
+<body>
+
+<header>📦 PRO45</header>
+
+<div class="container">
+
+<div class="card" id="home">
+<h3>👑 Crear formulario</h3>
+<input id="name" placeholder="Nombre"/>
+<button onclick="create()">Crear</button>
+<div id="list"></div>
+</div>
+
+<div class="card hidden" id="sheet">
+<div class="row">
+<button onclick="back()">⬅</button>
+<button onclick="save()">💾 Guardar</button>
+<button onclick="share()">📤</button>
+</div>
+
+<h3 id="title"></h3>
+<div id="items"></div>
+<button onclick="add()">➕ Agregar</button>
+</div>
+
+</div>
+
+<script>
 const firebaseConfig={
 apiKey:"AIzaSyD0HNFfvNqjYMspNtNFgRxy2segtsRspGo",
 authDomain:"t3-2-1a478.firebaseapp.com",
@@ -48,112 +58,104 @@ projectId:"t3-2-1a478"
 firebase.initializeApp(firebaseConfig);
 const db=firebase.database();
 
-let currentId=null;
-let holdTimer;
+let idActual=null;
+let dataActual={items:[]};
+let hold;
 
-function createForm(){
-  const name=document.getElementById("formName").value.trim();
-  if(!name) return;
+function create(){
+const name=document.getElementById("name").value;
+if(!name) return;
 
-  const id=db.ref("forms").push().key;
-  const slug=name.toLowerCase().replace(/\s+/g,'-');
+const id=db.ref("forms").push().key;
 
-  db.ref("forms/"+id).set({name,slug,items:[]});
-  openSheet(id);
-  loadForms();
+db.ref("forms/"+id).set({
+name,
+items:[]
+});
+
+open(id);
+load();
 }
 
-function openSheet(id){
-  currentId=id;
-  db.ref("forms/"+id).once("value",s=>{
-    const d=s.val();
-    document.getElementById("home").classList.add("hidden");
-    document.getElementById("sheet").classList.remove("hidden");
-    document.getElementById("title").innerText=d.name;
-    render(d.items||[]);
-    saveHistory("open",d.name);
-  });
+function open(id){
+idActual=id;
+
+db.ref("forms/"+id).once("value",s=>{
+dataActual=s.val() || {items:[]};
+
+if(!dataActual.items) dataActual.items=[];
+
+document.getElementById("home").classList.add("hidden");
+document.getElementById("sheet").classList.remove("hidden");
+document.getElementById("title").innerText=dataActual.name;
+
+render();
+});
 }
 
-function render(items){
-  const box=document.getElementById("items");
-  box.innerHTML="";
+function render(){
+const box=document.getElementById("items");
+box.innerHTML="";
 
-  items.forEach((i,index)=>{
-    const row=document.createElement("div");
-    row.className="tableRow";
-
-    row.innerHTML=`
-      <input value="${i.n}" oninput="update(${index},'n',this.value)">
-      <input value="${i.q}" oninput="update(${index},'q',this.value)">
-      <button onmousedown="hold(${index})" onmouseup="clearHold()">🗑</button>
-    `;
-
-    box.appendChild(row);
-  });
+dataActual.items.forEach((i,idx)=>{
+box.innerHTML+=`
+<div class="tableRow">
+<input value="${i.n||""}" oninput="edit(${idx},'n',this.value)">
+<input value="${i.q||""}" oninput="edit(${idx},'q',this.value)">
+<button onmousedown="holdDel(${idx})" onmouseup="clearHold()">🗑</button>
+</div>`;
+});
 }
 
-function addRow(){
-  db.ref("forms/"+currentId).once("value",s=>{
-    let d=s.val();
-    d.items.push({n:"",q:""});
-    db.ref("forms/"+currentId).update({items:d.items});
-    render(d.items);
-  });
+function add(){
+dataActual.items.push({n:"",q:""});
+render();
 }
 
-function update(i,k,v){
-  db.ref("forms/"+currentId).once("value",s=>{
-    let d=s.val();
-    d.items[i][k]=v;
-    db.ref("forms/"+currentId).update({items:d.items});
-  });
+function edit(i,k,v){
+dataActual.items[i][k]=v;
 }
 
-function hold(i){
-  holdTimer=setTimeout(()=>{
-    db.ref("forms/"+currentId).once("value",s=>{
-      let d=s.val();
-      d.items.splice(i,1);
-      db.ref("forms/"+currentId).update({items:d.items});
-      render(d.items);
-    });
-  },600);
-}
-function clearHold(){clearTimeout(holdTimer);}
-
-function saveSheet(){
-  saveHistory("save","actualizado");
-  alert("Guardado ✔");
+function save(){
+db.ref("forms/"+idActual).update(dataActual);
+alert("Guardado ✔");
 }
 
-function shareLink(){
-  db.ref("forms/"+currentId).once("value",s=>{
-    const d=s.val();
-    const link=location.origin+"/f/"+d.slug;
-    window.open("https://wa.me/?text="+encodeURIComponent("📋 Formulario:\n"+link));
-  });
+function holdDel(i){
+hold=setTimeout(()=>{
+dataActual.items.splice(i,1);
+render();
+},600);
 }
 
-function backHome(){location.reload();}
+function clearHold(){clearTimeout(hold);}
 
-function saveHistory(a,t){
-  db.ref("history").push({a,t,date:Date.now()});
+function share(){
+db.ref("forms/"+idActual).once("value",s=>{
+const d=s.val();
+const link=location.origin+"/f/"+d.name;
+window.open("https://wa.me/?text="+encodeURIComponent(link));
+});
 }
 
-function loadHistory(){
-  db.ref("history").on("value",s=>{
-    const d=s.val()||{};
-    const box=document.getElementById("history");
-    box.innerHTML="";
-    Object.values(d).forEach(h=>{
-      box.innerHTML+=`<pre>${h.a} - ${h.t}</pre>`;});
+function back(){
+location.reload();
+}
 
-}); }
+function load(){
+db.ref("forms").on("value",s=>{
+const d=s.val()||{};
+const box=document.getElementById("list");
+box.innerHTML="";
 
-function loadForms(){ db.ref("forms").on("value",s=>{ const d=s.val()||{}; const box=document.getElementById("forms"); box.innerHTML=""; Object.entries(d).forEach(([id,f])=>{ box.innerHTML+=<div class='item'><b>${f.name}</b><button onclick="openSheet('${id}')">Abrir</button></div>; }); }); }
+Object.entries(d).forEach(([id,f])=>{
+box.innerHTML+=`<div>${f.name} <button onclick="open('${id}')">Abrir</button></div>`;
+});
+});
+}
 
-loadForms(); loadHistory(); </script>
+load();
+</script>
 
 </body>
 </html>
