@@ -1,0 +1,138 @@
+<!DOCTYPE html><html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Inventario PRO V14 (Roles por URL)</title><style>
+:root{
+  --bg:#f5f7ff;
+  --card:#ffffff;
+  --primary:#2563eb;
+  --danger:#ef4444;
+  --muted:#64748b;
+}
+body{margin:0;font-family:Arial;background:var(--bg);}
+header{background:var(--primary);color:white;padding:14px;font-weight:bold;}
+.container{max-width:900px;margin:auto;padding:15px;}
+.card{background:var(--card);padding:15px;border-radius:12px;margin-bottom:12px;box-shadow:0 4px 10px rgba(0,0,0,0.06);}
+input{width:100%;padding:10px;margin:6px 0;border:1px solid #ddd;border-radius:8px;}
+button{padding:10px;border:none;border-radius:8px;cursor:pointer;background:var(--primary);color:white;}
+.btn-danger{background:var(--danger);}
+.row{display:flex;gap:10px;flex-wrap:wrap;}
+.tableRow{display:grid;grid-template-columns:1fr 120px;gap:10px;margin-top:8px;}
+.hidden{display:none !important;}
+small{color:var(--muted);}
+</style><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script></head>
+<body><header>📦 PRO V14</header><div class="container"><!-- CREATOR --><div class="card" id="creator">
+  <h3>👑 Creator</h3>
+  <input id="formName" placeholder="Nombre del formulario" />
+  <div id="creatorItems"></div>
+  <button onclick="addCreatorItem()">➕ Agregar artículo</button>
+  <button onclick="createForm()">Crear formulario</button>
+</div><!-- LIST --><div class="card" id="list">
+  <h3>📁 Formularios</h3>
+  <div id="forms"></div>
+</div><!-- FILL --><div class="card hidden" id="fill">
+  <h3>✍️ Fill</h3>
+  <div id="rows"></div>
+  <button onclick="addExtra()">➕ Extra</button>
+  <button onclick="submitForm()">Enviar</button>
+</div><!-- VIEW --><div class="card hidden" id="view">
+  <h3> View</h3>
+  <div id="responses"></div>
+</div></div><script>
+const firebaseConfig={
+apiKey:"AIzaSyD0HNFfvNqjYMspNtNFgRxy2segtsRspGo",
+authDomain:"t3-2-1a478.firebaseapp.com",
+databaseURL:"https://t3-2-1a478-default-rtdb.firebaseio.com",
+projectId:"t3-2-1a478"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+
+let currentForm=null;
+const WA="18124047266";
+
+function getMode(){
+const p=location.pathname;
+if(p.startsWith("/f/"))  "fill";
+if(p.startsWith("/v/"))  "view";
+return "creator";
+}
+
+function init(){
+const m=getMode();
+document.getElementById("creator").style.display=m=="creator"?"block":"none";
+document.getElementById("list").style.display=m=="creator"?"block":"none";
+document.getElementById("fill").style.display=m=="fill"?"block":"none";
+document.getElementById("view").style.display=m=="view"?"block":"none";
+}
+
+function addCreatorItem(){
+const d=document.createElement("div");
+d.className="tableRow";
+d.innerHTML=`<input class='cItem'><button onclick="this.parentElement.remove()">🗑</button>`;
+document.getElementById("creatorItems").appendChild(d);
+}
+
+function createForm(){
+const name=document.getElementById("formName").value;
+let items=[];
+document.querySelectorAll(".cItem").forEach(i=>i.value&&items.push(i.value));
+const id=db.ref("forms").push().key;
+const slug=name.toLowerCase().replace(/\s+/g,'-');
+db.ref("forms/"+id).set({name,slug,items});
+loadForms();
+}
+
+function loadForms(){
+db.ref("forms").on("value",s=>{
+const d=s.val()||{};
+const box=document.getElementById("forms");
+box.innerHTML="";
+Object.entries(d).forEach(([id,f])=>{
+box.innerHTML+=`<div class='item'><b>${f.name}</b><button onclick="openFill('${id}')">Fill</button><button onclick="openView('${id}')">View</button></div>`;
+});
+});
+}
+
+function openFill(id){
+db.ref("forms/"+id).once("value",s=>{
+currentForm={id,...s.val()};
+history.pushState({},"","/f/"+currentForm.slug);
+init();
+const box=document.getElementById("rows");box.innerHTML="";
+(currentForm.items||[]).forEach(n=>{
+box.innerHTML+=`<div class='tableRow'><input value='${n}' disabled><input class='qty'></div>`;
+});
+});
+}
+
+function addExtra(){
+document.getElementById("rows").innerHTML+=`<div class='tableRow'><input placeholder='extra'><input class='qty'></div>`;
+}
+
+function submitForm(){
+let items=[];
+document.querySelectorAll("#rows .tableRow").forEach(r=>{
+let n=r.children[0].value;
+let q=r.querySelector(".qty").value;
+if(n&&q)items.push({n,q});
+});
+db.ref("responses/"+currentForm.id).push(items);
+window.open("https://wa.me/"+WA+"?text="+encodeURIComponent(JSON.stringify(items)));
+}
+
+function openView(id){
+db.ref("forms/"+id).once("value",s=>{
+currentForm={id,...s.val()};
+history.pushState({},"","/v/"+currentForm.slug);
+init();
+db.ref("responses/"+id).once("value",r=>{
+const d=r.val()||{};
+document.getElementById("responses").innerHTML=Object.values(d).map(x=>"<pre>"+JSON.stringify(x,null,2)+"</pre>").join("");}); }); }
+
+window.onload=()=>{loadForms();init();}; </script>
+
+</body>
+</html>
