@@ -1,160 +1,273 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8"/>
+<meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title> PROx45 </title>
+<title>Inventario PRO V10 SaaS</title>
 
 <style>
-body{margin:0;font-family:Arial;background:#f5f7ff;}
-header{background:#2563eb;color:#fff;padding:14px;font-weight:bold;}
+:root{
+  --bg:#f5f7ff;
+  --card:#ffffff;
+  --primary:#2563eb;
+  --danger:#ef4444;
+  --muted:#64748b;
+}
+body{margin:0;font-family:Arial;background:var(--bg);}
+header{background:var(--primary);color:white;padding:14px;font-weight:bold;}
 .container{max-width:900px;margin:auto;padding:15px;}
-.card{background:#fff;padding:15px;border-radius:12px;margin-bottom:12px;}
-input{width:100%;padding:10px;margin:6px 0;}
-button{padding:10px;border:none;border-radius:8px;background:#2563eb;color:white;cursor:pointer;}
-.row{display:flex;gap:10px}
-.tableRow{display:grid;grid-template-columns:1fr 1fr 40px;gap:10px;margin-top:8px;}
-.hidden{display:none}
+.card{background:var(--card);padding:15px;border-radius:12px;margin-bottom:12px;box-shadow:0 4px 10px rgba(0,0,0,0.06);}
+input{width:100%;padding:10px;margin:6px 0;border:1px solid #ddd;border-radius:8px;}
+button{padding:10px;border:none;border-radius:8px;cursor:pointer;background:var(--primary);color:white;}
+.btn-danger{background:var(--danger);}
+.btn-secondary{background:#334155;}
+.item{padding:10px;background:#f8fafc;border-radius:8px;margin-top:6px;display:flex;justify-content:space-between;align-items:center;}
+.row{display:flex;gap:10px;flex-wrap:wrap;}
+.tableRow{display:grid;grid-template-columns:1fr 120px 40px;gap:10px;margin-top:8px;}
+.hidden{display:none !important;}
+small{color:var(--muted);}
 </style>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 </head>
+
 <body>
 
-<header>📦 PRO45</header>
+<header>📦PRO"V10</header>
 
 <div class="container">
 
-<div class="card" id="home">
-<h3>👑 Crear formulario</h3>
-<input id="name" placeholder="Nombre"/>
-<button onclick="create()">Crear</button>
-<div id="list"></div>
+<!-- CREATOR -->
+<div class="card" id="creatorPanel">
+  <h3>➕ Crear formulario</h3>
+  <input id="formName" placeholder="Nombre del formulario" />
+  <button onclick="createForm()">Crear</button>
 </div>
 
-<div class="card hidden" id="sheet">
-<div class="row">
-<button onclick="back()">⬅</button>
-<button onclick="save()">💾 Guardar</button>
-<button onclick="share()">📤</button>
+<!-- LIST -->
+<div class="card" id="listPanel">
+  <h3>📁 Formularios</h3>
+  <div id="forms"></div>
 </div>
 
-<h3 id="title"></h3>
-<div id="items"></div>
-<button onclick="add()">➕ Agregar</button>
+<!-- FILL MODE -->
+<div id="fill" class="card hidden">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <h3>🧾 f</h3>
+
+    <button class="btn-secondary" onclick="shareCurrentForm()">
+      📤 Compartir
+    </button>
+  </div>
+
+  <p style="color:#64748b;font-size:13px;">
+    ✔ <br>
+    ✔ 
+  </p>
+
+  <div id="rows"></div>
+
+  <button onclick="addRow()">➕ Agregar artículo</button>
+  <button onclick="submitForm()">📲 Enviar a WhatsApp</button>
+</div>
+
+<!-- VIEW MODE -->
+<div id="view" class="card hidden">
+  <h3>📊 View</h3>
+  <div id="responses"></div>
+  <button class="btn-secondary" onclick="goBack()">⬅ Volver</button>
 </div>
 
 </div>
 
 <script>
-const firebaseConfig={
-apiKey:"AIzaSyD0HNFfvNqjYMspNtNFgRxy2segtsRspGo",
-authDomain:"t3-2-1a478.firebaseapp.com",
-databaseURL:"https://t3-2-1a478-default-rtdb.firebaseio.com",
-projectId:"t3-2-1a478"
+const firebaseConfig = {
+  apiKey: "AIzaSyD0HNFfvNqjYMspNtNFgRxy2segtsRspGo",
+  authDomain: "t3-2-1a478.firebaseapp.com",
+  databaseURL: "https://t3-2-1a478-default-rtdb.firebaseio.com",
+  projectId: "t3-2-1a478",
+  storageBucket: "t3-2-1a478.firebasestorage.app",
+  messagingSenderId: "260103217483",
+  appId: "1:260103217483:web:961c5bdc464067ed06c8ce"
 };
 
 firebase.initializeApp(firebaseConfig);
-const db=firebase.database();
+const db = firebase.database();
 
-let idActual=null;
-let dataActual={items:[]};
-let hold;
+let currentForm=null;
+const WHATSAPP_NUMBER="+18124047266";
 
-function create(){
-const name=document.getElementById("name").value;
-if(!name) return;
+/* CREATE */
+function createForm(){
+  const name=document.getElementById("formName").value.trim();
+  if(!name) return;
 
-const id=db.ref("forms").push().key;
+  const slug=name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
+  const id=db.ref("forms").push().key;
 
-db.ref("forms/"+id).set({
-name,
-items:[]
-});
-
-open(id);
-load();
+  db.ref("forms/"+id).set({name,slug});
+  loadForms();
 }
 
-function open(id){
-idActual=id;
+/* LOAD */
+function loadForms(){
+  db.ref("forms").on("value",snap=>{
+    const data=snap.val()||{};
+    const box=document.getElementById("forms");
+    box.innerHTML="";
 
-db.ref("forms/"+id).once("value",s=>{
-dataActual=s.val() || {items:[]};
+    Object.entries(data).forEach(([id,f])=>{
+      const link="/f/"+f.slug;
 
-if(!dataActual.items) dataActual.items=[];
-
-document.getElementById("home").classList.add("hidden");
-document.getElementById("sheet").classList.remove("hidden");
-document.getElementById("title").innerText=dataActual.name;
-
-render();
-});
+      box.innerHTML+=`
+      <div class='item'>
+        <div>
+          <b>${f.name}</b><br>
+          <small>${link}</small>
+        </div>
+        <div class='row'>
+          <button onclick="openFill('${id}')">Abrir</button>
+          <button onclick="shareForm('${link}')">WhatsApp</button>
+        </div>
+      </div>`;
+    });
+  });
 }
 
-function render(){
-const box=document.getElementById("items");
-box.innerHTML="";
-
-dataActual.items.forEach((i,idx)=>{
-box.innerHTML+=`
-<div class="tableRow">
-<input value="${i.n||""}" oninput="edit(${idx},'n',this.value)">
-<input value="${i.q||""}" oninput="edit(${idx},'q',this.value)">
-<button onmousedown="holdDel(${idx})" onmouseup="clearHold()">🗑</button>
-</div>`;
-});
+/* FIND */
+function findFormBySlug(slug,cb){
+  db.ref("forms").once("value",snap=>{
+    const forms=snap.val()||{};
+    const entry=Object.entries(forms).find(([id,f])=>f.slug===slug);
+    cb(entry);
+  });
 }
 
-function add(){
-dataActual.items.push({n:"",q:""});
-render();
+/* OPEN FILL */
+function openFill(id){
+  db.ref("forms/"+id).once("value",snap=>{
+    currentForm={id,...snap.val()};
+
+    document.getElementById("fill").classList.remove("hidden");
+    document.getElementById("creatorPanel").classList.add("hidden");
+    document.getElementById("listPanel").classList.add("hidden");
+    document.getElementById("view").classList.add("hidden");
+
+    document.getElementById("rows").innerHTML="";
+    addRow();
+  });
 }
 
-function edit(i,k,v){
-dataActual.items[i][k]=v;
+/* SHARE ONLY FOR FILL */
+function shareCurrentForm(){
+  const link=window.location.origin+"/f/"+currentForm.slug;
+
+  window.open(
+    "https://wa.me/?text="+encodeURIComponent("📋:\n"+link),
+    "_blank"
+  );
 }
 
-function save(){
-db.ref("forms/"+idActual).update(dataActual);
-alert("Guardado ✔");
+/* ROW */
+function addRow(name="",qty=""){
+  const row=document.createElement("div");
+  row.className="tableRow";
+
+  row.innerHTML=`
+    <input placeholder="Artículo" class="itemName" value="${name}">
+    <input placeholder="Cantidad" type="number" class="itemQty" value="${qty}">
+    <button onclick="this.parentElement.remove()">🗑</button>
+  `;
+
+  document.getElementById("rows").appendChild(row);
 }
 
-function holdDel(i){
-hold=setTimeout(()=>{
-dataActual.items.splice(i,1);
-render();
-},600);
+/* SUBMIT */
+function submitForm(){
+  let items=[];
+
+  document.querySelectorAll(".tableRow").forEach(r=>{
+    let name=r.querySelector(".itemName").value;
+    let qty=r.querySelector(".itemQty").value;
+    if(name && qty) items.push({name,qty});
+  });
+
+  if(items.length===0){
+    alert("Agrega artículos");
+    return;
+  }
+
+  db.ref("responses/"+currentForm.id).push(items);
+
+  let text="📦 Inventario:%0A";
+  items.forEach(i=>text+=i.name+": "+i.qty+"%0A");
+
+  window.open(
+    "https://wa.me/"+WHATSAPP_NUMBER+"?text="+encodeURIComponent(text),
+    "_blank"
+  );
 }
 
-function clearHold(){clearTimeout(hold);}
+/* VIEW */
+function openFromURL(){
+  const path=window.location.pathname;
 
-function share(){
-db.ref("forms/"+idActual).once("value",s=>{
-const d=s.val();
-const link=location.origin+"/f/"+d.name;
-window.open("https://wa.me/?text="+encodeURIComponent(link));
-});
+  if(path.startsWith("/f/")){
+    const slug=path.replace("/f/","");
+    findFormBySlug(slug,entry=>{
+      if(entry) openFill(entry[0]);
+    });
+  }
+
+  if(path.startsWith("/v/")){
+    const slug=path.replace("/v/","");
+    findFormBySlug(slug,entry=>{
+      if(entry){
+        const id=entry[0];
+
+        db.ref("responses/"+id).once("value",snap=>{
+          const data=snap.val()||{};
+          const box=document.getElementById("responses");
+          box.innerHTML="";
+
+          Object.values(data).forEach(r=>{
+            box.innerHTML+=`<div class='item'>${JSON.stringify(r)}</div>`;
+          });
+
+          document.getElementById("view").classList.remove("hidden");
+          document.getElementById("creatorPanel").classList.add("hidden");
+          document.getElementById("listPanel").classList.add("hidden");
+        });
+      }
+    });
+  }
 }
 
-function back(){
-location.reload();
+/* BACK */
+function goBack(){
+  window.location.href="/";
 }
 
-function load(){
-db.ref("forms").on("value",s=>{
-const d=s.val()||{};
-const box=document.getElementById("list");
-box.innerHTML="";
-
-Object.entries(d).forEach(([id,f])=>{
-box.innerHTML+=`<div>${f.name} <button onclick="open('${id}')">Abrir</button></div>`;
-});
-});
+/* DELETE (solo creator via UI oculto en fill) */
+function deleteForm(id){
+  db.ref("forms/"+id).remove();
+  db.ref("responses/"+id).remove();
+  loadForms();
 }
 
-load();
+/* SHARE CREATOR */
+function shareForm(link){
+  window.open(
+    "https://wa.me/?text="+encodeURIComponent("📋 Llena este formulario:\n"+window.location.origin+link),
+    "_blank"
+  );
+}
+
+window.onload=function(){
+  loadForms();
+  openFromURL();
+};
 </script>
 
 </body>
