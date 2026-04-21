@@ -1,208 +1,196 @@
-<!DOCTYPE html>
-<html lang="es">
+<!DOCTYPE html><html lang="es">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Inven</title>
-
-<style>
-body{margin:0;font-family:Arial;background:#f5f7ff;}
-header{background:#2563eb;color:white;padding:14px;font-weight:bold;}
+<title>Inventario PRO V8</title><style>
+:root{
+  --bg:#f5f7ff;
+  --card:#ffffff;
+  --primary:#2563eb;
+  --danger:#ef4444;
+  --muted:#64748b;
+}
+body{margin:0;font-family:Arial;background:var(--bg);}
+header{background:var(--primary);color:white;padding:14px;font-weight:bold;}
 .container{max-width:900px;margin:auto;padding:15px;}
-.card{background:white;padding:15px;border-radius:12px;margin-bottom:12px;}
-input{width:100%;padding:10px;margin:6px 0;}
-button{padding:10px;border:none;border-radius:8px;background:#2563eb;color:white;cursor:pointer;}
+.card{background:var(--card);padding:15px;border-radius:12px;margin-bottom:12px;box-shadow:0 4px 10px rgba(0,0,0,0.06);}
+input{width:100%;padding:10px;margin:6px 0;border:1px solid #ddd;border-radius:8px;}
+button{padding:10px;border:none;border-radius:8px;cursor:pointer;background:var(--primary);color:white;}
+.btn-danger{background:var(--danger);}
+.btn-secondary{background:#334155;}
+.item{padding:10px;background:#f8fafc;border-radius:8px;margin-top:6px;display:flex;justify-content:space-between;align-items:center;}
 .row{display:flex;gap:10px;flex-wrap:wrap;}
-.item{display:grid;grid-template-columns:1fr 1fr 40px;gap:10px;margin-top:8px;}
-.hidden{display:none;}
-small{color:#64748b;}
-</style>
-
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-
-</head>
-<body>
-
-<header>📦 INxPRO</header>
-
-<div class="container">
-
-<!-- CREATOR -->
-<div class="card" id="creator">
-  <h3>Crear formulario</h3>
-  <input id="name" placeholder="Nombre formulario">
-  <button onclick="create()">Crear</button>
-  <div id="list"></div>
-</div>
-
-<!-- EDITOR -->
-<div class="card hidden" id="editor">
-  <div class="row">
-    <button onclick="back()">⬅</button>
-    <button onclick="add()">➕</button>
-    <button onclick="save()">💾 Guardar</button>
-    <button onclick="share()">📤 Compartir</button>
-  </div>
-
-  <h3 id="title"></h3>
-  <div id="items"></div>
-</div>
-
-<!-- VIEW -->
-<div class="card hidden" id="view">
-  <h3>📊 Respuestas</h3>
-  <div id="responses"></div>
-</div>
-
-</div>
-
-<script>
-
-const firebaseConfig={
-apiKey:"AIzaSyD0HNFfvNqjYMspNtNFgRxy2segtsRspGo",
-authDomain:"t3-2-1a478.firebaseapp.com",
-databaseURL:"https://t3-2-1a478-default-rtdb.firebaseio.com",
-projectId:"t3-2-1a478"
+.tableRow{display:grid;grid-template-columns:1fr 120px 40px;gap:10px;margin-top:8px;}
+small{color:var(--muted);}
+</style><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script></head>
+<body><header>📦 PRO"V7</header><div class="container"><div class="card" id="home">
+  <h3>➕ Crear formulario</h3>
+  <input id="formName" placeholder="Nombre del formulario" />
+  <button onclick="createForm()">Crear</button>
+</div><div class="card">
+  <h3>📁 Formularios</h3>
+  <div id="forms"></div>
+</div><div id="fill" class="card" style="display:none">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <h3>🧾list</h3>
+    <button class="btn-secondary" onclick="goBack()">⬅ Volver</button>
+  </div>  <div id="rows"></div>
+  <button onclick="addRow()">➕ Agregar artículo</button>
+  <button onclick="submitForm()">📲 Enviar a WhatsApp</button>
+</div></div><script>
+const firebaseConfig = {
+  apiKey: "AIzaSyD0HNFfvNqjYMspNtNFgRxy2segtsRspGo",
+  authDomain: "t3-2-1a478.firebaseapp.com",
+  databaseURL: "https://t3-2-1a478-default-rtdb.firebaseio.com",
+  projectId: "t3-2-1a478",
+  storageBucket: "t3-2-1a478.firebasestorage.app",
+  messagingSenderId: "260103217483",
+  appId: "1:260103217483:web:961c5bdc464067ed06c8ce"
 };
 
 firebase.initializeApp(firebaseConfig);
-const db=firebase.database();
+const db = firebase.database();
 
-let currentId=null;
-let data={items:[]};
+let currentForm=null;
+let debounceTimer;
+const WHATSAPP_NUMBER="1+8124047266";
 
-/* CREATE */
-function create(){
-const name=document.getElementById("name").value;
-if(!name) return;
+function createForm(){
+  const name=document.getElementById("formName").value.trim();
+  if(!name) return;
 
-const id=db.ref("forms").push().key;
+  const slug=name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
+  const id=db.ref("forms").push().key;
 
-db.ref("forms/"+id).set({
-name,
-slug:name.toLowerCase().replace(/\s+/g,'-'),
-items:[]
-});
-
-open(id);
-load();
+  db.ref("forms/"+id).set({name,slug});
+  loadForms();
 }
 
-/* OPEN EDITOR */
-function open(id){
-currentId=id;
+function loadForms(){
+  db.ref("forms").on("value",snap=>{
+    const data=snap.val()||{};
+    const box=document.getElementById("forms");
+    box.innerHTML="";
 
-db.ref("forms/"+id).once("value",s=>{
-data=s.val();
-
-document.getElementById("creator").classList.add("hidden");
-document.getElementById("editor").classList.remove("hidden");
-
-document.getElementById("title").innerText=data.name;
-
-render();
-});
+    Object.entries(data).forEach(([id,f])=>{
+      box.innerHTML+=`
+      <div class='item'>
+        <div>
+          <b>${f.name}</b><br>
+          <small>/${f.slug}</small>
+        </div>
+        <div class='row'>
+          <button onclick="openForm('${id}')">Abrir</button>
+          <button onclick="shareForm('${id}')">WhatsApp</button>
+          <button class='btn-danger' onclick="deleteForm('${id}')">Eliminar</button>
+        </div>
+      </div>`;
+    });
+  });
 }
 
-/* RENDER */
-function render(){
-let box=document.getElementById("items");
-box.innerHTML="";
+function openForm(id){
+  db.ref("forms/"+id).once("value",snap=>{
+    currentForm={id,...snap.val()};
 
-(data.items||[]).forEach((i,index)=>{
-box.innerHTML+=`
-<div class="item">
-<input value="${i.n||""}" oninput="edit(${index},'n',this.value)">
-<input value="${i.q||""}" maxlength="2" oninput="edit(${index},'q',this.value)">
-<button onclick="removeItem(${index})">🗑</button>
-</div>`;
-});
+    document.getElementById("rows").innerHTML="";
+
+    db.ref("drafts/"+id).once("value",d=>{
+      const items=d.val()||[];
+      if(items.length){
+        items.forEach(i=>addRow(i.name,i.qty));
+      } else {
+        addRow();
+      }
+    });
+
+    document.getElementById("home").style.display="none";
+    document.querySelectorAll(".card")[1].style.display="none";
+    document.getElementById("fill").style.display="block";
+  });
 }
 
-/* ADD */
-function add(){
-data.items.push({n:"",q:""});
-render();
+function goBack(){
+  document.getElementById("fill").style.display="none";
+  document.getElementById("home").style.display="block";
+  document.querySelectorAll(".card")[1].style.display="block";
 }
 
-/* EDIT */
-function edit(i,k,v){
-data.items[i][k]=v;
+function addRow(name="",qty=""){
+  const row=document.createElement("div");
+  row.className="tableRow";
+
+  row.innerHTML=`
+    <input placeholder="Artículo" class="itemName" value="${name}">
+    <input placeholder="Cantidad" type="number" class="itemQty" value="${qty}">
+    <button onclick="this.parentElement.remove(); autoSave()">🗑</button>
+  `;
+
+  row.querySelectorAll("input").forEach(i=>{
+    i.addEventListener("input", autoSave);
+  });
+
+  document.getElementById("rows").appendChild(row);
 }
 
-/* DELETE */
-function removeItem(i){
-data.items.splice(i,1);
-render();
+function autoSave(){
+  clearTimeout(debounceTimer);
+
+  debounceTimer=setTimeout(()=>{
+    if(!currentForm) return;
+
+    const items=[];
+
+    document.querySelectorAll(".tableRow").forEach(r=>{
+      const name=r.querySelector(".itemName").value;
+      const qty=r.querySelector(".itemQty").value;
+      if(name||qty) items.push({name,qty});
+    });
+
+    db.ref("drafts/"+currentForm.id).set(items);
+  },500);
 }
 
-/* SAVE */
-function save(){
-db.ref("forms/"+currentId).update(data);
-alert("Guardado ✔");
+function submitForm(){
+  let items=[];
+
+  document.querySelectorAll(".tableRow").forEach(r=>{
+    let name=r.querySelector(".itemName").value;
+    let qty=r.querySelector(".itemQty").value;
+    if(name&&qty) items.push({name,qty});
+  });
+
+  if(items.length===0){alert("Agrega artículos");return;}
+
+  db.ref("responses/"+currentForm.id).push(items);
+
+  let text="📦 Inventario:";
+  items.forEach(i=>text+=i.name+": "+i.qty+"");
+
+  window.open("https://wa.me/"+WHATSAPP_NUMBER+"?text="+encodeURIComponent(text),"_blank");
+
+  alert("✔ Enviado a WhatsApp");
 }
 
-/* SHARE */
-function share(){
-db.ref("forms/"+currentId).once("value",s=>{
-const d=s.val();
-const link=window.location.origin+"/v/"+d.slug;
+function shareForm(id){
+  db.ref("forms/"+id).once("value",snap=>{
+    const f=snap.val();
+    const link=window.location.origin+"/"+f.slug;
 
-window.open(
-"https://wa.me/?text="+encodeURIComponent("📦 Ver formulario:\n"+link),
-"_blank"
-);
-});
+    window.open("https://wa.me/?text="+encodeURIComponent("📋 Llena este formulario:\n"+link),"_blank");
+  });
 }
 
-/* LOAD LIST */
-function load(){
-db.ref("forms").on("value",s=>{
-let d=s.val()||{};
-let box=document.getElementById("list");
-box.innerHTML="";
+function deleteForm(id){
+  if(!confirm("¿Eliminar formulario?")) return;
 
-Object.entries(d).forEach(([id,f])=>{
-box.innerHTML+=`
-<div>
-<b>${f.name}</b>
-<button onclick="open('${id}')">Abrir</button>
-<button onclick="view('${id}')">View</button>
-</div>`;
-});
-});
+  db.ref("forms/"+id).remove();
+  db.ref("responses/"+id).remove();
+  db.ref("drafts/"+id).remove();
+
+  loadForms();
 }
 
-/* VIEW */
-function view(id){
-db.ref("responses/"+id).once("value",s=>{
-let d=s.val()||{};
-let box=document.getElementById("responses");
-box.innerHTML="";
-
-Object.values(d).forEach(r=>{
-box.innerHTML+=`<div class="item">${JSON.stringify(r)}</div>`;
-});
-
-document.getElementById("creator").classList.add("hidden");
-document.getElementById("editor").classList.add("hidden");
-document.getElementById("view").classList.remove("hidden");
-});
-}
-
-/* BACK */
-function back(){
-location.reload();
-}
-
-function goHome(){
-location.reload();
-}
-
-load();
-
-</script>
-
-</body>
+loadForms();
+</script></body>
 </html>
