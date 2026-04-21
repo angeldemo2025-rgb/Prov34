@@ -2,7 +2,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Inventario PRO V14 (Roles por URL)</title><style>
+<title>Inventario PRO V15 (Autosave + Roles)</title><style>
 :root{
   --bg:#f5f7ff;
   --card:#ffffff;
@@ -18,17 +18,17 @@ input{width:100%;padding:10px;margin:6px 0;border:1px solid #ddd;border-radius:8
 button{padding:10px;border:none;border-radius:8px;cursor:pointer;background:var(--primary);color:white;}
 .btn-danger{background:var(--danger);}
 .row{display:flex;gap:10px;flex-wrap:wrap;}
-.tableRow{display:grid;grid-template-columns:1fr 120px;gap:10px;margin-top:8px;}
+.tableRow{display:grid;grid-template-columns:1fr 40px;gap:10px;margin-top:8px;align-items:center;}
 .hidden{display:none !important;}
 small{color:var(--muted);}
 </style><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script></head>
-<body><header>📦 PRO V14</header><div class="container"><!-- CREATOR --><div class="card" id="creator">
-  <h3>👑 Creator</h3>
+<body><header>📦 Inventario PRO V15 (Autosave + Roles)</header><div class="container"><!-- CREATOR --><div class="card" id="creator">
+  <h3>👑 Creator (edición en vivo)</h3>
   <input id="formName" placeholder="Nombre del formulario" />
   <div id="creatorItems"></div>
   <button onclick="addCreatorItem()">➕ Agregar artículo</button>
   <button onclick="createForm()">Crear formulario</button>
-</div><!-- LIST --><div class="card" id="list">
+</div><!-- LIST --><div class="card">
   <h3>📁 Formularios</h3>
   <div id="forms"></div>
 </div><!-- FILL --><div class="card hidden" id="fill">
@@ -37,7 +37,7 @@ small{color:var(--muted);}
   <button onclick="addExtra()">➕ Extra</button>
   <button onclick="submitForm()">Enviar</button>
 </div><!-- VIEW --><div class="card hidden" id="view">
-  <h3> View</h3>
+  <h3>👁 View</h3>
   <div id="responses"></div>
 </div></div><script>
 const firebaseConfig={
@@ -51,36 +51,49 @@ firebase.initializeApp(firebaseConfig);
 const db=firebase.database();
 
 let currentForm=null;
+let autosaveTimer;
 const WA="18124047266";
 
 function getMode(){
 const p=location.pathname;
-if(p.startsWith("/f/"))  "fill";
-if(p.startsWith("/v/"))  "view";
+if(p.startsWith("/f/")) return "fill";
+if(p.startsWith("/v/")) return "view";
 return "creator";
 }
 
 function init(){
 const m=getMode();
 document.getElementById("creator").style.display=m=="creator"?"block":"none";
-document.getElementById("list").style.display=m=="creator"?"block":"none";
+document.querySelector(".card:nth-child(2)").style.display=m=="creator"?"block":"none";
 document.getElementById("fill").style.display=m=="fill"?"block":"none";
 document.getElementById("view").style.display=m=="view"?"block":"none";
 }
 
-function addCreatorItem(){
+/* CREATOR EDIT + AUTOSAVE */
+function addCreatorItem(val=""){
 const d=document.createElement("div");
 d.className="tableRow";
-d.innerHTML=`<input class='cItem'><button onclick="this.parentElement.remove()">🗑</button>`;
+d.innerHTML=`<input class='cItem' value='${val}' placeholder='Artículo'><button onclick="this.parentElement.remove();autoSaveCreator()">🗑</button>`;
 document.getElementById("creatorItems").appendChild(d);
 }
 
+function autoSaveCreator(){
+if(!currentForm) return;
+clearTimeout(autosaveTimer);
+autosaveTimer=setTimeout(()=>{
+let items=[];
+document.querySelectorAll(".cItem").forEach(i=>i.value&&items.push(i.value));
+db.ref("forms/"+currentForm.id).update({items});
+},500);
+}
+
 function createForm(){
-const name=document.getElementById("formName").value;
+const name=document.getElementById("formName").value.trim();
 let items=[];
 document.querySelectorAll(".cItem").forEach(i=>i.value&&items.push(i.value));
 const id=db.ref("forms").push().key;
 const slug=name.toLowerCase().replace(/\s+/g,'-');
+currentForm={id};
 db.ref("forms/"+id).set({name,slug,items});
 loadForms();
 }
@@ -88,14 +101,31 @@ loadForms();
 function loadForms(){
 db.ref("forms").on("value",s=>{
 const d=s.val()||{};
-const box=document.getElementById("forms");
+const box=document.querySelector(".card:nth-child(2) div");
 box.innerHTML="";
 Object.entries(d).forEach(([id,f])=>{
-box.innerHTML+=`<div class='item'><b>${f.name}</b><button onclick="openFill('${id}')">Fill</button><button onclick="openView('${id}')">View</button></div>`;
+box.innerHTML+=`
+<div class='item'>
+<div><b>${f.name}</b></div>
+<div class='row'>
+<button onclick="openFill('${id}')">Fill</button>
+<button onclick="openView('${id}')">View</button>
+<button onclick="editCreator('${id}')">Edit</button>
+</div>
+</div>`;
 });
 });
 }
 
+function editCreator(id){
+db.ref("forms/"+id).once("value",s=>{
+currentForm={id,...s.val()};
+document.getElementById("creatorItems").innerHTML="";
+(currentForm.items||[]).forEach(i=>addCreatorItem(i));
+});
+}
+
+/* FILL */
 function openFill(id){
 db.ref("forms/"+id).once("value",s=>{
 currentForm={id,...s.val()};
@@ -103,7 +133,7 @@ history.pushState({},"","/f/"+currentForm.slug);
 init();
 const box=document.getElementById("rows");box.innerHTML="";
 (currentForm.items||[]).forEach(n=>{
-box.innerHTML+=`<div class='tableRow'><input value='${n}' disabled><input class='qty'></div>`;
+box.innerHTML+=`<div class='tableRow'><input value='${n}' disabled><input class='qty' placeholder='cantidad'></div>`;
 });
 });
 }
@@ -123,6 +153,7 @@ db.ref("responses/"+currentForm.id).push(items);
 window.open("https://wa.me/"+WA+"?text="+encodeURIComponent(JSON.stringify(items)));
 }
 
+/* VIEW */
 function openView(id){
 db.ref("forms/"+id).once("value",s=>{
 currentForm={id,...s.val()};
